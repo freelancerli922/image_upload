@@ -1,12 +1,27 @@
 # -*- coding: utf-8 -*-
 import requests
 from selenium import webdriver
-import time, os, json
-
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.keys import Keys
+import time, os, json, threading
+# import pywinauto
 def get_driver():
     # driver = webdriver.Chrome(chrome_options=chrome_options, desired_capabilities=capabilities)
-    driver = webdriver.Firefox()
+    driver = webdriver.Chrome()
     return driver
+
+def handle_dialog(element_initiating_dialog, dialog_text_input, driver):
+    def _handle_dialog(_element_initiating_dialog):
+        _element_initiating_dialog.click() # thread hangs here until upload dialog closes
+    t = threading.Thread(target=_handle_dialog, args=[element_initiating_dialog] )
+    t.start()
+    time.sleep(1) # poor thread synchronization, but good enough
+
+    upload_dialog = driver.switch_to_active_element()
+    upload_dialog.send_keys(dialog_text_input)
+    upload_dialog.send_keys(Keys.ENTER)
 
 def image_upload(url):
     driver = get_driver()
@@ -20,50 +35,59 @@ def image_upload(url):
         time.sleep(1)
         pw_edit.click()
         pw_edit.send_keys("testing123")
-        time.sleep(3)
+        time.sleep(20)
         # login_button.click()
         time.sleep(2)
-        driver.get("https://www.zazzle.com/create")
 
-    body = driver.page_source
+    driver.get("https://www.zazzle.com/mens_basic_dark_t_shirt-235188229222196359")
 
+    # ///////////////////////image upload///////////////////////////
+    add_button = driver.find_element_by_xpath('//*[@class="Button Button--Submit Button--Medium"]')
+    add_button.click()
+    time.sleep(2)
+    folder = os.getcwd()+"/image/"
+    files_path = [folder + x for x in os.listdir(folder)]
+    imagelist = []
+    textlist = []
+    for file in files_path:
+        filename, file_extension = os.path.splitext(file)
+        if file_extension.lower() != '.txt':
+            imagelist.append(file)
+        else:
+            textlist.append(file)
+    for image_path in imagelist:
+        path = image_path
+        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, '//input[@type="file"][@name="image"]'))).send_keys(path)
+        # time.sleep(2)
+        # start the upload
+        # dialogWindow = pywinauto.application.Application()
+        # windowHandle = pywinauto.findwindows.find_windows(title=u'Open', class_name='#32770')[0]
+        # window = dialogWindow.window_(handle=windowHandle)
+        # # this is the element that I would like to access (not sure)
+        # toolbar = window.Children()[41]
+        # # send keys:
+        # toolbar.TypeKeys("path/to/the/folder/")
+        # # insert file name:
+        # window.Edit.SetText(path)
+        # # click on open:
+        # window["Open"].Click()
+        time.sleep(12)
 
-    url = 'https://www.zazzle.com/up/isapi/designall.dll?type=service&action=upload&sessionqs=0&output=js&comm_mode=ajax&cg=1'
-    crsf = body.split('"csrfToken":')[-1].split(',')[0]
+    # ////////////////text upload///////////////////////
+    for text_path in textlist:
+        text_file = open(text_path, "r")
+        description = text_file.read()
+        buttons = driver.find_elements_by_xpath('//*[@class="Button Button--Submit Button--Medium"]')
+        text_button = buttons[3]
+        text_button.click()
+        text_area = driver.find_element_by_xpath('//*[@class="TextArea-textarea"]')
+        text_area.send_keys(description)
+        add_text_btn = driver.find_element_by_xpath('//*[@class="Button Button--Submit Button--Small Button--isIcon"]')
+        add_text_btn.click()
+        time.sleep(2)
 
-    # crsf = '"767b3d702211f0a6"'
-    # driver.close()
-
-    url = 'https://www.zazzle.com/up/isapi/designall.dll?type=service&action=upload&sessionqs=0&output=js&comm_mode=ajax&cg=1'
-    # data = {'dir':'/uploads/', 'submit':'Submit'}
-    files = {'file':('1.jpg', open('1.jpg', 'rb'))}
-    r = requests.post(url, files=files)
-    print(r.content)
-
-    uploaded_images = json.loads(r.content)["children"]
-    for image in uploaded_images:
-        url = 'https://www.zazzle.com/svc/my/mediabrowser/NotifyChangedImageList'
-        image_id = image['attributes']['id'].lower()
-        datas = {"changedIds":"[\"{}\"]".format(image_id),"csrf":crsf,"client":"js"}
-        headers = {
-            'Content-type': 'application/json',
-            # 'accept-encoding':'gzip, deflate, br',
-            # 'accept-language':'en-US,en;q=0.9',
-            # 'content-length':'99',
-            # 'cookie':'us=890A99AB-DF34-45CF-A782-A261AD17488C; NSC_xxx01=ffffffff09099e0445525d5f4f58455e445a4a423660; _ga=GA1.2.688207428.1521008558; _gid=GA1.2.452139422.1521008558; NSC_smw=ffffffff09099a0b45525d5f4f58455e445a4a423660; NSC_vq=ffffffff09099d6a45525d5f4f58455e445a4a423660; zm=AQABAAAA7REAABRbDC6mqUFzUWSMEyFzT6jLaJGc6L8nBGh-UKAZ6F76MMNvuKT66JhCHJn3WgB6DuRCoiwJ9QM6qh-zCznfDUTzwxKGfCsvL-f8w3YdTMsI-9JU7c69eBnz3uslLh5hkd468TKKHv8zh3ITKJ86CTxWbefP_UbtlDYZMxnQqaSn8fDcc1e_3YeZFtfqE7JShkj8AcIFz38qjOzkB-T4qf2NQbEmRBh9zkLJjamV1ccJ_0sYzL8; zs=8BDC8F59-0BBE-44B3-B654-91FC3629526A%7c238059915219723352%7c13165501839%7cAQABAAAA7REAABSRBzM9x0PHEar7glv6T-5GpIG7qawY0xQngiqtNJpw1uR3x4y-Qw9M9Tv2b04AphJYf8-nCPG9g93_o5i0-ahjdAMxYw%7c; general%5Fmaturity=2; bx=zlng%3den%26zlng_x%3d131692896000000000%26promoanim%3d1%26promoanim_x%3d131655109580087923%26lsr%3d250132743741107740%26lsr_x%3d131693766186333411%26udnm%3dtruths%26udnm_x%3d131655036418835484; bs=pis%3d86%26zshopurl%3dz%2fcustom%2fclothing%3fcyo%253Dclothing%26ps%3d60; _br_uid_2=uid%3D5169876493919%3Av%3D12.0%3Ats%3D1521008560444%3Ahc%3D77',
-            # 'origin':'https://www.zazzle.com',
-            # 'referer':'https://www.zazzle.com/womens_basic_t_shirt-235643286926699897',
-            # 'user-agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.186 Safari/537.36'
-        }
-        rsp = requests.post(url, json=datas, headers=headers)
-        print rsp.content
-
-
-
-    # ////////////////////////selenium upload///////////////////////
-    # driver.find_element_by_id("IdOfInputTypeFile").send_keys(os.getcwd()+"/image.png")
 
 site_urls = ['https://www.zazzle.com/lgn/signin']
-
 for url in site_urls:
     image_upload(url)
+
