@@ -38,7 +38,7 @@ def image_upload(url):
         time.sleep(20)
         # login_button.click()
         time.sleep(2)
-
+        
     driver.get("https://www.zazzle.com/mens_basic_dark_t_shirt-235188229222196359")
 
     # ///////////////////////image upload///////////////////////////
@@ -78,7 +78,7 @@ def image_upload(url):
         text_file = open(text_path, "r")
         description = text_file.read()
         buttons = driver.find_elements_by_xpath('//*[@class="Button Button--Submit Button--Medium"]')
-        text_button = buttons[3]
+        text_button = buttons[2]
         text_button.click()
         text_area = driver.find_element_by_xpath('//*[@class="TextArea-textarea"]')
         text_area.send_keys(description)
